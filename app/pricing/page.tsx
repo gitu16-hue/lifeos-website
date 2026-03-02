@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Check, 
@@ -102,7 +102,6 @@ const plans = [
 export default function PricingPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
-  const cardRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const handleCardClick = (planId: string, href: string, e: React.MouseEvent) => {
     // Don't navigate if clicking on a button or interactive element
@@ -192,7 +191,6 @@ export default function PricingPage() {
               return (
                 <div
                   key={plan.id}
-                  ref={el => cardRefs.current[plan.id] = el}
                   onClick={(e) => handleCardClick(plan.id, plan.href, e)}
                   className="relative cursor-pointer"
                 >
