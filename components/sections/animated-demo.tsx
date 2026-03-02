@@ -8,7 +8,6 @@ import {
   Target, 
   Clock, 
   Sparkles,
-  ArrowRight,
   CheckCircle,
   Activity
 } from 'lucide-react';
@@ -100,7 +99,10 @@ export function AnimatedDemo() {
                 >
                   <div className="text-center mb-8">
                     <div className={`inline-flex p-4 rounded-2xl bg-gradient-to-r ${steps[step].color} mb-6`}>
-                      {steps[step].icon && <steps[step].icon className="w-12 h-12 text-white" />}
+                      {(() => {
+                        const Icon = steps[step].icon;
+                        return <Icon className="w-12 h-12 text-white" />;
+                      })()}
                     </div>
                     <h3 className="text-2xl font-bold mb-2">{steps[step].title}</h3>
                     <p className="text-gray-400">{steps[step].description}</p>
