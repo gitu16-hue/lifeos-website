@@ -1,4 +1,6 @@
-﻿import { Navbar } from '../components/ui/navbar';
+﻿'use client';  // ← Add this at the top!
+
+import { Navbar } from '../components/ui/navbar';
 import { ThreeDBackground } from '../components/3d/background';
 import { HeroAI } from '../components/sections/hero-ai';
 import { LiveCounter } from '../components/sections/live-counter';
@@ -15,7 +17,7 @@ import { FAQSection } from '../components/sections/faq';
 import { CTASection } from '../components/sections/cta';
 import { Footer } from '../components/ui/footer';
 import Link from 'next/link';
-import { motion } from 'framer-motion'; // ← Add this import!
+import { motion } from 'framer-motion';
 
 export default function Home() {
   return (
