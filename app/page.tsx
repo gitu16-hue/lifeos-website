@@ -15,6 +15,7 @@ import { FAQSection } from '../components/sections/faq';
 import { CTASection } from '../components/sections/cta';
 import { Footer } from '../components/ui/footer';
 import Link from 'next/link';
+import { motion } from 'framer-motion'; // ← Add this import!
 
 export default function Home() {
   return (
