@@ -14,13 +14,6 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
   const handlePayment = async () => {
     setLoading(true);
     
-    const res = await loadRazorpay();
-    if (!res) {
-      alert('Razorpay SDK failed to load');
-      setLoading(false);
-      return;
-    }
-
     try {
       const orderResponse = await fetch('/api/create-razorpay-order', {
         method: 'POST',
@@ -29,6 +22,21 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
       });
       
       const order = await orderResponse.json();
+
+      // Check if we're in mock mode
+      if (order.mock) {
+        alert('Demo mode: Payment successful! (This is a mock)');
+        window.location.href = '/payment/success';
+        return;
+      }
+
+      // Load Razorpay SDK
+      const res = await loadRazorpay();
+      if (!res) {
+        alert('Razorpay SDK failed to load');
+        setLoading(false);
+        return;
+      }
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -59,6 +67,7 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
       razorpay.open();
     } catch (error) {
       console.error('Payment failed:', error);
+      alert('Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }
