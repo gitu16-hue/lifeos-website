@@ -101,11 +101,11 @@ const plans = [
 
 export default function PricingPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
 
-  const handleCardClick = (planId: string, href: string) => {
-    if (planId === 'pro') {
-      // Pro plan uses Razorpay button, don't navigate on card click
+  const handleCardClick = (planId: string, href: string, e: React.MouseEvent) => {
+    // Don't navigate if clicking on the Razorpay button (Pro plan)
+    if (planId === 'pro' && (e.target as HTMLElement).closest('button')) {
       return;
     }
     window.location.href = href;
@@ -123,7 +123,8 @@ export default function PricingPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6 cursor-pointer hover:bg-white/10 transition-all"
+                 onClick={() => window.location.href = '/pricing'}>
               <Rocket className="w-4 h-4 text-secondary" />
               <span className="text-sm font-medium">Simple Pricing</span>
             </div>
@@ -135,11 +136,11 @@ export default function PricingPage() {
               Start free, upgrade as you grow. All plans include a 14-day trial.
             </p>
 
-            {/* Billing Toggle */}
+            {/* Billing Toggle - Clickable */}
             <div className="flex items-center justify-center gap-4 mt-8">
               <button
                 onClick={() => setSelectedPlan('monthly')}
-                className={`px-6 py-2 rounded-full transition-all flex items-center gap-2 ${
+                className={`px-6 py-2 rounded-full transition-all flex items-center gap-2 cursor-pointer ${
                   selectedPlan === 'monthly'
                     ? 'bg-gradient-to-r from-primary to-secondary text-white'
                     : 'glass hover:bg-white/10'
@@ -150,7 +151,7 @@ export default function PricingPage() {
               </button>
               <button
                 onClick={() => setSelectedPlan('annual')}
-                className={`px-6 py-2 rounded-full transition-all flex items-center gap-2 ${
+                className={`px-6 py-2 rounded-full transition-all flex items-center gap-2 cursor-pointer ${
                   selectedPlan === 'annual'
                     ? 'bg-gradient-to-r from-primary to-secondary text-white'
                     : 'glass hover:bg-white/10'
@@ -162,12 +163,11 @@ export default function PricingPage() {
             </div>
           </motion.div>
 
-          {/* Pricing Cards */}
+          {/* Pricing Cards - All Clickable */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan, index) => {
               const Icon = plan.icon;
               const isHovered = hoveredCard === plan.id;
-              const isPro = plan.id === 'pro';
 
               return (
                 <motion.div
@@ -177,7 +177,7 @@ export default function PricingPage() {
                   transition={{ delay: index * 0.1 }}
                   onHoverStart={() => setHoveredCard(plan.id)}
                   onHoverEnd={() => setHoveredCard(null)}
-                  onClick={() => handleCardClick(plan.id, plan.href)}
+                  onClick={(e) => handleCardClick(plan.id, plan.href, e)}
                   className={`relative cursor-pointer transform transition-all duration-500 ${
                     isHovered ? 'scale-105 -translate-y-2' : ''
                   } ${plan.popular ? 'z-10' : ''}`}
@@ -187,10 +187,14 @@ export default function PricingPage() {
                     isHovered ? 'opacity-20' : ''
                   }`} />
 
-                  {/* Popular badge */}
+                  {/* Popular badge - Clickable */}
                   {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                      <div className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20 cursor-pointer"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           window.location.href = '/pricing?plan=pro';
+                         }}>
+                      <div className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1 hover:opacity-90 transition-opacity">
                         <Star className="w-3 h-3" />
                         Most Popular
                         <Star className="w-3 h-3" />
@@ -208,8 +212,12 @@ export default function PricingPage() {
                       isHovered ? 'translate-x-full' : '-translate-x-full'
                     }`} />
 
-                    {/* Icon with glow */}
-                    <div className="relative mb-6">
+                    {/* Icon - Clickable */}
+                    <div className="relative mb-6 cursor-pointer"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           window.location.href = `/features/${plan.id}`;
+                         }}>
                       <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${plan.gradient} p-3 transform transition-all duration-500 ${
                         isHovered ? 'scale-110 rotate-6' : ''
                       }`}>
@@ -220,13 +228,22 @@ export default function PricingPage() {
                       }`} />
                     </div>
                     
-                    {/* Title & Price */}
-                    <div className="mb-4">
-                      <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
+                    {/* Title & Description - Clickable */}
+                    <div className="mb-4 cursor-pointer"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           window.location.href = `/plans/${plan.id}`;
+                         }}>
+                      <h3 className="text-2xl font-bold mb-1 group-hover:text-gradient transition-all">{plan.name}</h3>
                       <p className="text-sm text-gray-400">{plan.description}</p>
                     </div>
                     
-                    <div className="mb-6">
+                    {/* Price - Clickable */}
+                    <div className="mb-6 cursor-pointer"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           window.location.href = `/pricing/${plan.id}`;
+                         }}>
                       <div className="flex items-end gap-1">
                         <span className="text-4xl font-bold">
                           {plan.id === 'pro' ? (
@@ -244,7 +261,7 @@ export default function PricingPage() {
                       )}
                     </div>
                     
-                    {/* Features */}
+                    {/* Features - Each feature clickable */}
                     <ul className="space-y-3 mb-8 flex-grow">
                       {plan.features.map((feature, i) => (
                         <motion.li
@@ -252,28 +269,34 @@ export default function PricingPage() {
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: index * 0.1 + i * 0.05 }}
-                          className={`flex items-start gap-2 ${
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/features/${feature.text.toLowerCase().replace(/\s+/g, '-')}`;
+                          }}
+                          className={`flex items-start gap-2 cursor-pointer group/feature ${
                             feature.included ? 'text-gray-300' : 'text-gray-600'
                           }`}
                         >
-                          <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                          <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 transition-all group-hover/feature:scale-110 ${
                             feature.included ? 'text-secondary' : 'text-gray-600'
                           }`} />
-                          <span className="text-sm">{feature.text}</span>
+                          <span className="text-sm group-hover/feature:text-white transition-colors">{feature.text}</span>
                         </motion.li>
                       ))}
                     </ul>
                     
                     {/* CTA Button */}
-                    {isPro ? (
-                      <RazorpayButton 
-                        amount={plan.razorpayAmount} 
-                        planName={plan.name}
-                      />
+                    {plan.id === 'pro' ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <RazorpayButton 
+                          amount={plan.razorpayAmount} 
+                          planName={plan.name}
+                        />
+                      </div>
                     ) : (
-                      <Link href={plan.href} className="block w-full">
+                      <Link href={plan.href} className="block w-full" onClick={(e) => e.stopPropagation()}>
                         <button
-                          className={`w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 group ${
+                          className={`w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 group cursor-pointer ${
                             plan.popular
                               ? 'bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90'
                               : 'glass hover:bg-white/10'
@@ -307,7 +330,7 @@ export default function PricingPage() {
             })}
           </div>
 
-          {/* Trust badges */}
+          {/* Trust badges - All Clickable */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -315,29 +338,31 @@ export default function PricingPage() {
             className="flex flex-wrap items-center justify-center gap-8 mt-16"
           >
             {[
-              { icon: Shield, text: '30-day money-back' },
-              { icon: Users, text: '5,000+ active users' },
-              { icon: Globe, text: 'Global coverage' },
-              { icon: Coffee, text: 'Free forever plan' },
-              { icon: Infinity, text: 'Cancel anytime' },
+              { icon: Shield, text: '30-day money-back', href: '/guarantee' },
+              { icon: Users, text: '5,000+ active users', href: '/community' },
+              { icon: Globe, text: 'Global coverage', href: '/coverage' },
+              { icon: Coffee, text: 'Free forever plan', href: '/free-plan' },
+              { icon: Infinity, text: 'Cancel anytime', href: '/cancel-policy' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-500">
-                <item.icon className="w-4 h-4 text-secondary" />
-                <span>{item.text}</span>
-              </div>
+              <Link key={i} href={item.href}>
+                <div className="flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors cursor-pointer group">
+                  <item.icon className="w-4 h-4 text-secondary group-hover:scale-110 transition-transform" />
+                  <span>{item.text}</span>
+                </div>
+              </Link>
             ))}
           </motion.div>
 
-          {/* FAQ Link */}
+          {/* FAQ Link - Clickable */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
             className="text-center mt-12"
           >
-            <Link href="/faq" className="text-secondary hover:text-white transition-colors inline-flex items-center gap-1">
+            <Link href="/faq" className="text-secondary hover:text-white transition-colors inline-flex items-center gap-1 group">
               Have questions? Check our FAQ
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </motion.div>
         </div>
