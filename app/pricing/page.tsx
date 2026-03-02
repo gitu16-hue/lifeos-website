@@ -3,14 +3,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Zap, Crown, Sparkles, IndianRupee } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
 import { RazorpayButton } from '@/components/ui/razorpay-button';
 import { Navbar } from '@/components/ui/navbar';
 import { ThreeDBackground } from '@/components/3d/background';
 import { Footer } from '@/components/ui/footer';
-
-// Initialize Stripe outside of component
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const plans = [
   {
@@ -31,7 +27,6 @@ const plans = [
     gradient: 'from-gray-500 to-gray-600',
     buttonText: 'Get Started',
     popular: false,
-    priceId: null,
     razorpayAmount: 0
   },
   {
@@ -54,7 +49,6 @@ const plans = [
     gradient: 'from-primary to-secondary',
     buttonText: 'Subscribe Now',
     popular: true,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || 'price_pro_monthly',
     razorpayAmount: 2499
   },
   {
@@ -77,56 +71,13 @@ const plans = [
     gradient: 'from-purple-500 to-pink-500',
     buttonText: 'Contact Sales',
     popular: false,
-    priceId: null,
     razorpayAmount: 0
   }
 ];
 
 export default function PricingPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'razorpay'>('stripe');
-
-  const handleSubscribe = async (priceId: string, planName: string) => {
-    if (!priceId) {
-      window.location.href = '/signup';
-      return;
-    }
-
-    try {
-      setIsLoading(planName);
-      
-      // Create checkout session
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          priceId,
-          successUrl: `${window.location.origin}/payment/success`,
-          cancelUrl: `${window.location.origin}/pricing`,
-        }),
-      });
-
-      const { sessionId } = await response.json();
-      
-      // Redirect to Stripe Checkout
-      const stripe = await stripePromise;
-      if (!stripe) throw new Error('Stripe failed to load');
-      
-      const { error } = await stripe.redirectToCheckout({ sessionId });
-      
-      if (error) {
-        console.error('Stripe error:', error.message);
-        alert('Payment failed: ' + error.message);
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
-    } finally {
-      setIsLoading(null);
-    }
-  };
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay'>('razorpay');
 
   const handleContactSales = () => {
     window.location.href = '/contact';
@@ -151,28 +102,10 @@ export default function PricingPage() {
               Start free, upgrade as you grow. All plans include a 14-day trial.
             </p>
 
-            {/* Currency Toggle */}
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <button
-                onClick={() => setPaymentMethod('stripe')}
-                className={`px-6 py-2 rounded-full transition-all ${
-                  paymentMethod === 'stripe'
-                    ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                    : 'glass hover:bg-white/10'
-                }`}
-              >
-                💵 USD
-              </button>
-              <button
-                onClick={() => setPaymentMethod('razorpay')}
-                className={`px-6 py-2 rounded-full transition-all flex items-center gap-1 ${
-                  paymentMethod === 'razorpay'
-                    ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                    : 'glass hover:bg-white/10'
-                }`}
-              >
-                <IndianRupee className="w-4 h-4" /> INR
-              </button>
+            {/* Currency Indicator */}
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <IndianRupee className="w-5 h-5 text-secondary" />
+              <span className="text-sm text-gray-400">All prices in INR (India)</span>
             </div>
           </motion.div>
 
@@ -207,9 +140,7 @@ export default function PricingPage() {
                     <p className="text-gray-400 mb-4">{plan.description}</p>
                     
                     <div className="mb-6">
-                      <span className="text-4xl font-bold">
-                        {paymentMethod === 'stripe' ? plan.price : plan.inrPrice}
-                      </span>
+                      <span className="text-4xl font-bold">{plan.inrPrice}</span>
                       {plan.period && <span className="text-gray-400 ml-2">/{plan.period}</span>}
                     </div>
                     
@@ -222,7 +153,7 @@ export default function PricingPage() {
                       ))}
                     </ul>
                     
-                    {plan.name === 'Pro' && paymentMethod === 'razorpay' ? (
+                    {plan.name === 'Pro' ? (
                       <RazorpayButton 
                         amount={plan.razorpayAmount} 
                         planName={plan.name}
@@ -232,7 +163,7 @@ export default function PricingPage() {
                       <button
                         onClick={() => plan.name === 'Enterprise' 
                           ? handleContactSales() 
-                          : handleSubscribe(plan.priceId!, plan.name)
+                          : window.location.href = '/signup'
                         }
                         disabled={isLoadingPlan}
                         className={`w-full py-4 rounded-xl font-semibold transition-all ${
@@ -250,22 +181,7 @@ export default function PricingPage() {
             })}
           </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="flex flex-wrap items-center justify-center gap-6 mt-8 text-sm text-gray-500"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span>Stripe: USD (International)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-blue-400" />
-              <span>Razorpay: INR (India)</span>
-            </div>
-          </motion.div>
-
+          {/* Money-back guarantee */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
