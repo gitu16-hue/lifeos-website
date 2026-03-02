@@ -157,7 +157,6 @@ export default function PricingPage() {
                       <RazorpayButton 
                         amount={plan.razorpayAmount} 
                         planName={plan.name}
-                        disabled={isLoadingPlan}
                       />
                     ) : (
                       <button

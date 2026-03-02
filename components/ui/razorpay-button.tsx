@@ -22,7 +22,6 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
     }
 
     try {
-      // Create order from your backend
       const orderResponse = await fetch('/api/create-razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,7 +38,6 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
         description: `${planName} Plan Subscription`,
         order_id: order.id,
         handler: function(response: any) {
-          // Verify payment
           fetch('/api/verify-razorpay-payment', {
             method: 'POST',
             body: JSON.stringify(response),
@@ -70,7 +68,7 @@ export function RazorpayButton({ amount, planName }: RazorpayButtonProps) {
     <button
       onClick={handlePayment}
       disabled={loading}
-      className="w-full py-4 bg-gradient-to-r from-primary to-secondary rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+      className="w-full py-4 rounded-xl font-semibold transition-all bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? 'Processing...' : `Pay ₹${amount}`}
     </button>
