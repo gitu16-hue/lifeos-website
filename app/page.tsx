@@ -8,12 +8,13 @@ import { WorldMap } from '../components/sections/world-map';
 import { AIMetrics } from '../components/sections/ai-metrics';
 import { SystemHealth } from '../components/sections/system-health';
 import { HowItWorksSection } from '../components/sections/how-it-works';
-import { AnimatedDemo } from '../components/sections/animated-demo'; // Changed from DemoSection
+import { AnimatedDemo } from '../components/sections/animated-demo';
 import { TestimonialsSection } from '../components/sections/testimonials';
 import { PricingSection } from '../components/sections/pricing';
 import { FAQSection } from '../components/sections/faq';
 import { CTASection } from '../components/sections/cta';
 import { Footer } from '../components/ui/footer';
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -46,7 +47,7 @@ export default function Home() {
         <HowItWorksSection />
         
         {/* Animated Demo - Interactive product demonstration */}
-        <AnimatedDemo /> {/* Changed from DemoSection */}
+        <AnimatedDemo />
         
         {/* Testimonials - Social proof */}
         <TestimonialsSection />
@@ -61,6 +62,25 @@ export default function Home() {
         <CTASection />
       </main>
       <Footer />
+      
+      {/* Floating Action Button - Clickable */}
+      <Link href="/waitlist">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 2 }}
+          className="fixed bottom-8 right-8 z-50 group cursor-pointer"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary rounded-full blur-xl opacity-75 group-hover:opacity-100 animate-pulse" />
+            <div className="relative w-14 h-14 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center">
+              <span className="text-2xl">✨</span>
+            </div>
+          </div>
+        </motion.div>
+      </Link>
     </>
   );
 }
