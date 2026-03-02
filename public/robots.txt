@@ -1,0 +1,10 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://lifeos.ai/sitemap.xml
+
+# Disallow admin pages
+Disallow: /api/
+Disallow: /admin/

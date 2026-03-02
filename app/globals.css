@@ -1,0 +1,636 @@
+@import "tailwindcss";
+
+@theme {
+  /* Core Colors - Enhanced palette */
+  --color-background: #0A0A0A;
+  --color-background-secondary: #0F0F0F;
+  --color-primary: #6C5CE7;
+  --color-primary-dark: #4A3B9F;
+  --color-primary-light: #8F7FFF;
+  --color-secondary: #00F5D4;
+  --color-secondary-dark: #00B8A0;
+  --color-secondary-light: #5AFFE8;
+  --color-accent: #FF6B6B;
+  --color-neural: #9D7BFF;
+  --color-consciousness: #4A90E2;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  --gradient-dark: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+  --gradient-neural: linear-gradient(135deg, var(--color-neural), var(--color-consciousness));
+  
+  /* Shadows */
+  --shadow-glow-primary: 0 0 30px -5px rgba(108, 92, 231, 0.5);
+  --shadow-glow-secondary: 0 0 30px -5px rgba(0, 245, 212, 0.5);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  --shadow-elevation: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  
+  /* Animations - Extended */
+  --animation-float: float 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animation-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animation-glow: glow 3s ease-in-out infinite;
+  --animation-neural-pulse: neural-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animation-data-flow: data-flow 12s linear infinite;
+  --animation-consciousness-wave: consciousness-wave 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animation-ripple: ripple 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animation-scan: scan 4s linear infinite;
+  --animation-rotate-slow: rotate 20s linear infinite;
+  --animation-shimmer: shimmer 3s infinite;
+  --animation-levitate: levitate 8s ease-in-out infinite;
+  
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+}
+
+/* Enhanced Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-25px) scale(1.03); }
+}
+
+@keyframes glow {
+  0%, 100% { 
+    opacity: 1; 
+    filter: blur(0px);
+    text-shadow: 0 0 20px var(--color-primary);
+  }
+  50% { 
+    opacity: 0.9; 
+    filter: blur(2px);
+    text-shadow: 0 0 40px var(--color-secondary);
+  }
+}
+
+@keyframes neural-pulse {
+  0%, 100% { 
+    opacity: 0.7; 
+    transform: scale(1);
+    filter: hue-rotate(0deg);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.08);
+    filter: hue-rotate(15deg);
+  }
+}
+
+@keyframes data-flow {
+  0% { 
+    background-position: -200% 0%;
+    opacity: 0.3;
+  }
+  50% { 
+    opacity: 0.8;
+  }
+  100% { 
+    background-position: 200% 0%;
+    opacity: 0.3;
+  }
+}
+
+@keyframes consciousness-wave {
+  0% { 
+    transform: scale(1) rotate(0deg); 
+    filter: hue-rotate(0deg) blur(0px);
+  }
+  33% { 
+    transform: scale(1.05) rotate(120deg); 
+    filter: hue-rotate(60deg) blur(2px);
+  }
+  66% { 
+    transform: scale(0.95) rotate(240deg); 
+    filter: hue-rotate(120deg) blur(1px);
+  }
+  100% { 
+    transform: scale(1) rotate(360deg); 
+    filter: hue-rotate(180deg) blur(0px);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes levitate {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-15px) scale(1.02);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ping-slow {
+  75%, 100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes border-pulse {
+  0%, 100% {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 20px var(--color-primary);
+  }
+  50% {
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 40px var(--color-secondary);
+  }
+}
+
+/* Base Styles */
+body {
+  background-color: var(--color-background);
+  color: white;
+  font-family: var(--font-sans);
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "ss02" 1;
+  position: relative;
+  overflow-x: hidden;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Advanced AI Neural Network Background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(108, 92, 231, 0.2) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(0, 245, 212, 0.2) 0%, transparent 40%),
+    radial-gradient(circle at 40% 80%, rgba(157, 123, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 70% 20%, rgba(74, 144, 226, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 90% 40%, rgba(108, 92, 231, 0.1) 0%, transparent 30%),
+    radial-gradient(circle at 10% 60%, rgba(0, 245, 212, 0.1) 0%, transparent 30%);
+  pointer-events: none;
+  z-index: 0;
+  animation: consciousness-wave 30s ease-in-out infinite;
+}
+
+/* Secondary neural overlay */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    repeating-linear-gradient(45deg, 
+      transparent 0px, 
+      transparent 20px,
+      rgba(108, 92, 231, 0.03) 20px,
+      rgba(108, 92, 231, 0.03) 40px
+    );
+  pointer-events: none;
+  z-index: 0;
+  animation: data-flow 30s linear infinite;
+}
+
+/* Enhanced animated grid overlay */
+.neural-grid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(108, 92, 231, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(108, 92, 231, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(0, 245, 212, 0.03) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(0, 245, 212, 0.03) 2px, transparent 2px);
+  background-size: 50px 50px, 50px 50px, 100px 100px, 100px 100px;
+  pointer-events: none;
+  z-index: 1;
+  animation: data-flow 25s linear infinite;
+  opacity: 0.5;
+}
+
+/* Utility Classes */
+@utility container {
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  max-width: 1280px;
+}
+
+/* Text Gradients */
+@utility text-gradient {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-gradient-glow {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 30px rgba(108, 92, 231, 0.7));
+  animation: glow 3s ease-in-out infinite;
+}
+
+@utility text-gradient-neural {
+  background: var(--gradient-neural);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-primary) 25%,
+    var(--color-secondary) 50%,
+    var(--color-primary) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Glass Effects */
+@utility glass {
+  backdrop-filter: blur(16px) saturate(180%);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.1), 
+    rgba(255, 255, 255, 0.03)
+  );
+  border: 1px solid rgba(108, 92, 231, 0.2);
+  box-shadow: var(--shadow-glass);
+}
+
+@utility glass-intense {
+  backdrop-filter: blur(24px) saturate(200%);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15), 
+    rgba(255, 255, 255, 0.05)
+  );
+  border: 1px solid rgba(108, 92, 231, 0.3);
+  box-shadow: var(--shadow-glass), var(--shadow-glow-primary);
+}
+
+@utility glass-card {
+  backdrop-filter: blur(20px) saturate(180%);
+  background: linear-gradient(135deg, 
+    rgba(108, 92, 231, 0.15), 
+    rgba(0, 245, 212, 0.08)
+  );
+  border: 1px solid rgba(108, 92, 231, 0.25);
+  border-radius: 2rem;
+  box-shadow: var(--shadow-elevation), 0 0 30px -5px rgba(108, 92, 231, 0.3);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 40px 80px -10px rgba(108, 92, 231, 0.7),
+              0 0 50px -5px rgba(0, 245, 212, 0.5);
+  border-color: rgba(108, 92, 231, 0.5);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover::before {
+  left: 150%;
+}
+
+.glass-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--gradient-primary);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.glass-card:hover::after {
+  opacity: 1;
+}
+
+/* Advanced Animations */
+@utility floating {
+  animation: var(--animation-float);
+}
+
+@utility floating-slow {
+  animation: levitate 10s ease-in-out infinite;
+}
+
+@utility glow {
+  animation: var(--animation-glow);
+}
+
+@utility neural-pulse {
+  animation: var(--animation-neural-pulse);
+}
+
+@utility consciousness-wave {
+  animation: var(--animation-consciousness-wave);
+}
+
+@utility data-flow {
+  animation: var(--animation-data-flow);
+}
+
+@utility ripple {
+  animation: var(--animation-ripple);
+}
+
+@utility scan {
+  animation: var(--animation-scan);
+}
+
+@utility rotate-slow {
+  animation: var(--animation-rotate-slow);
+}
+
+@utility shimmer {
+  animation: var(--animation-shimmer);
+}
+
+@utility levitate {
+  animation: var(--animation-levitate);
+}
+
+@utility spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+@utility spin-slower {
+  animation: spin-slow 12s linear infinite;
+}
+
+@utility ping-slow {
+  animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@utility border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+/* Gradient Backgrounds */
+@utility gradient-bg {
+  background: linear-gradient(135deg, 
+    rgba(108, 92, 231, 0.2), 
+    rgba(0, 245, 212, 0.2),
+    rgba(157, 123, 255, 0.2)
+  );
+  background-size: 300% 300%;
+  animation: consciousness-wave 15s ease infinite;
+}
+
+@utility gradient-bg-intense {
+  background: linear-gradient(135deg, 
+    rgba(108, 92, 231, 0.3), 
+    rgba(0, 245, 212, 0.3),
+    rgba(157, 123, 255, 0.3)
+  );
+  background-size: 300% 300%;
+  animation: consciousness-wave 12s ease infinite;
+}
+
+@utility gradient-bg-subtle {
+  background: linear-gradient(135deg, 
+    rgba(108, 92, 231, 0.1), 
+    rgba(0, 245, 212, 0.1),
+    rgba(157, 123, 255, 0.1)
+  );
+  background-size: 300% 300%;
+  animation: consciousness-wave 20s ease infinite;
+}
+
+/* Neural Network Effects */
+@utility neural-connection {
+  position: relative;
+}
+
+.neural-connection::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    var(--color-primary), 
+    var(--color-secondary), 
+    transparent
+  );
+  transform: translateY(-50%);
+  animation: neural-pulse 3s ease-in-out infinite;
+}
+
+@utility neural-node {
+  position: relative;
+}
+
+.neural-node::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--gradient-primary);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.5;
+  animation: border-pulse 3s ease-in-out infinite;
+}
+
+/* Typography Utilities */
+@utility heading-1 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+@utility heading-2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+@utility heading-3 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Animation Delays */
+@utility animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+@utility animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+@utility animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+@utility animation-delay-500 {
+  animation-delay: 500ms;
+}
+
+@utility animation-delay-700 {
+  animation-delay: 700ms;
+}
+
+@utility animation-delay-1000 {
+  animation-delay: 1000ms;
+}
+
+@utility animation-delay-2000 {
+  animation-delay: 2000ms;
+}
+
+@utility animation-delay-3000 {
+  animation-delay: 3000ms;
+}
+
+@utility animation-delay-4000 {
+  animation-delay: 4000ms;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-secondary-light));
+}
+
+/* Selection Styling */
+::selection {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Focus Styles */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Media Queries */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  .glass,
+  .glass-card,
+  .neural-grid {
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
+}
