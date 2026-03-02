@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Zap, Crown, Sparkles, IndianRupee } from 'lucide-react';
-import { stripePromise } from '@/lib/stripe/client';
+import { loadStripe } from '@stripe/stripe-js';
 import { RazorpayButton } from '@/components/ui/razorpay-button';
 import { Navbar } from '@/components/ui/navbar';
 import { ThreeDBackground } from '@/components/3d/background';
 import { Footer } from '@/components/ui/footer';
+
+// Initialize Stripe outside of component
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const plans = [
   {
@@ -51,7 +54,7 @@ const plans = [
     gradient: 'from-primary to-secondary',
     buttonText: 'Subscribe Now',
     popular: true,
-    priceId: 'price_pro_monthly',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || 'price_pro_monthly',
     razorpayAmount: 2499
   },
   {
@@ -92,6 +95,7 @@ export default function PricingPage() {
     try {
       setIsLoading(planName);
       
+      // Create checkout session
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -106,18 +110,19 @@ export default function PricingPage() {
 
       const { sessionId } = await response.json();
       
+      // Redirect to Stripe Checkout
       const stripe = await stripePromise;
+      if (!stripe) throw new Error('Stripe failed to load');
       
-      // Use redirectToCheckout correctly
-      const result = await stripe!.redirectToCheckout({
-        sessionId: sessionId
-      });
-
-      if (result.error) {
-        console.error('Stripe error:', result.error.message);
+      const { error } = await stripe.redirectToCheckout({ sessionId });
+      
+      if (error) {
+        console.error('Stripe error:', error.message);
+        alert('Payment failed: ' + error.message);
       }
     } catch (error) {
       console.error('Payment error:', error);
+      alert('Payment failed. Please try again.');
     } finally {
       setIsLoading(null);
     }
