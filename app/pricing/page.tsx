@@ -28,7 +28,7 @@ const plans = [
     gradient: 'from-gray-500 to-gray-600',
     buttonText: 'Get Started',
     popular: false,
-    priceId: null, // free plan
+    priceId: null,
     razorpayAmount: 0
   },
   {
@@ -51,8 +51,8 @@ const plans = [
     gradient: 'from-primary to-secondary',
     buttonText: 'Subscribe Now',
     popular: true,
-    priceId: 'price_pro_monthly', // Stripe Price ID
-    razorpayAmount: 2499 // Amount in INR
+    priceId: 'price_pro_monthly',
+    razorpayAmount: 2499
   },
   {
     id: 'price_enterprise',
@@ -85,7 +85,6 @@ export default function PricingPage() {
 
   const handleSubscribe = async (priceId: string, planName: string) => {
     if (!priceId) {
-      // Free plan - redirect to signup
       window.location.href = '/signup';
       return;
     }
@@ -108,10 +107,14 @@ export default function PricingPage() {
       const { sessionId } = await response.json();
       
       const stripe = await stripePromise;
-      const { error } = await stripe!.redirectToCheckout({ sessionId });
+      
+      // Use redirectToCheckout correctly
+      const result = await stripe!.redirectToCheckout({
+        sessionId: sessionId
+      });
 
-      if (error) {
-        console.error('Stripe error:', error);
+      if (result.error) {
+        console.error('Stripe error:', result.error.message);
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -191,16 +194,13 @@ export default function PricingPage() {
                   )}
                   
                   <div className={`glass-card p-8 h-full flex flex-col ${plan.popular ? 'border-2 border-primary' : ''}`}>
-                    {/* Icon */}
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${plan.gradient} p-3 mb-6`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
                     
-                    {/* Title & Description */}
                     <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
                     <p className="text-gray-400 mb-4">{plan.description}</p>
                     
-                    {/* Price - Conditional based on payment method */}
                     <div className="mb-6">
                       <span className="text-4xl font-bold">
                         {paymentMethod === 'stripe' ? plan.price : plan.inrPrice}
@@ -208,7 +208,6 @@ export default function PricingPage() {
                       {plan.period && <span className="text-gray-400 ml-2">/{plan.period}</span>}
                     </div>
                     
-                    {/* Features */}
                     <ul className="space-y-3 mb-8 flex-grow">
                       {plan.features.map((feature, i) => (
                         <li key={i} className="flex items-start gap-2 text-gray-300">
@@ -218,7 +217,6 @@ export default function PricingPage() {
                       ))}
                     </ul>
                     
-                    {/* Button - Conditional rendering */}
                     {plan.name === 'Pro' && paymentMethod === 'razorpay' ? (
                       <RazorpayButton 
                         amount={plan.razorpayAmount} 
@@ -247,7 +245,6 @@ export default function PricingPage() {
             })}
           </div>
 
-          {/* Payment Methods Info */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -264,7 +261,6 @@ export default function PricingPage() {
             </div>
           </motion.div>
 
-          {/* Money-back guarantee */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
