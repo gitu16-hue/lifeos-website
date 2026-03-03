@@ -9,6 +9,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 
+// Create rate limiters map for different IPs
+const limiters = new Map();
+
+function getLimiter(clientIp: string) {
+  if (!limiters.has(clientIp)) {
+    // Create new limiter for this IP: 100 requests per hour
+    limiters.set(clientIp, new RateLimiter({
+      tokensPerInterval: 100,
+      interval: 'hour'
+    }));
+  }
+  return limiters.get(clientIp);
+}
+
 // Validation schema using Zod
 const WaitlistSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -18,12 +32,6 @@ const WaitlistSchema = z.object({
   utm_source: z.string().optional().nullable(),
   utm_medium: z.string().optional().nullable(),
   utm_campaign: z.string().optional().nullable(),
-});
-
-// Rate limiting (100 requests per hour per IP)
-const limiter = new RateLimiter({
-  tokensPerInterval: 100,
-  interval: 'hour',
 });
 
 // Initialize Resend for email notifications
@@ -40,9 +48,13 @@ export async function POST(request: Request) {
   
   try {
     // Rate limiting
-    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
-    const hasTokens = await limiter.tryRemoveTokens(1, clientIp);
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
     
+    const limiter = getLimiter(clientIp);
+    const hasTokens = await limiter.tryRemoveTokens(1);
+
     if (!hasTokens) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
@@ -96,11 +108,6 @@ export async function POST(request: Request) {
           utm_medium,
           utm_campaign,
           created_at: new Date().toISOString(),
-          metadata: {
-            ip: clientIp,
-            user_agent: request.headers.get('user-agent'),
-            timestamp: new Date().toISOString(),
-          }
         }
       ])
       .select()
@@ -137,15 +144,6 @@ export async function POST(request: Request) {
       sendConfirmationEmail(email, name, (position || 0) + 1).catch(console.error);
     }
 
-    // Track analytics (you can integrate with GA, Mixpanel, etc.)
-    trackAnalytics({
-      event: 'waitlist_signup',
-      email,
-      userType,
-      source,
-      position: (position || 0) + 1,
-    }).catch(console.error);
-
     const responseTime = Date.now() - startTime;
     console.log(`✅ Waitlist signup successful - ${email} (${responseTime}ms)`);
 
@@ -164,7 +162,6 @@ export async function POST(request: Request) {
         status: 200,
         headers: {
           'X-Response-Time': `${responseTime}ms`,
-          'X-RateLimit-Remaining': String(hasTokens),
         }
       }
     );
@@ -217,7 +214,6 @@ export async function GET(request: Request) {
 
     let stats = {};
     if (includeStats) {
-      // Get total count and daily signups
       const { count: total } = await supabase
         .from('waitlist')
         .select('*', { count: 'exact', head: true });
@@ -313,32 +309,4 @@ async function sendConfirmationEmail(email: string, name: string | null, positio
   } catch (error) {
     console.error('❌ Failed to send email:', error);
   }
-}
-
-// Helper: Track analytics
-async function trackAnalytics(event: any) {
-  // Integrate with your analytics service here
-  // Example: Google Analytics, Mixpanel, etc.
-  console.log('📊 Analytics event:', event);
-  
-  // You could send to a webhook, database, or analytics service
-  try {
-    // await fetch('https://analytics.example.com/track', {
-    //   method: 'POST',
-    //   body: JSON.stringify(event),
-    // });
-  } catch (error) {
-    // Silently fail - analytics should not break the main flow
-  }
-}
-
-// Optional: Add webhook support for Zapier/Make
-export async function OPTIONS() {
-  return NextResponse.json(
-    { 
-      methods: ['GET', 'POST', 'OPTIONS'],
-      webhook: 'https://lifeos.ai/api/webhook/waitlist'
-    },
-    { status: 200 }
-  );
 }
