@@ -234,22 +234,21 @@ export async function POST(request: Request) {
     }
 
     // ========== INSERT INTO DATABASE ==========
-    const insertData: any = {
+    const insertData = {
       email,
-      name,
+      name: name || null,
       user_type: userType,
-      source,
+      source: source || 'website',
       created_at: new Date().toISOString(),
+      utm_source: utm_source || null,
+      utm_medium: utm_medium || null,
+      utm_campaign: utm_campaign || null,
       metadata: { 
         ip: clientIp, 
         user_agent: request.headers.get('user-agent'),
         timestamp: new Date().toISOString()
       },
     };
-    
-    if (utm_source) insertData.utm_source = utm_source;
-    if (utm_medium) insertData.utm_medium = utm_medium;
-    if (utm_campaign) insertData.utm_campaign = utm_campaign;
 
     let data = null;
     let insertError = null;
