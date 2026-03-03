@@ -1,14 +1,33 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for API routes
-);
+// Dynamic import for Supabase - only loads when needed
+let supabaseInstance: any = null;
+
+async function getSupabase() {
+  if (supabaseInstance) return supabaseInstance;
+  
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('Supabase environment variables missing - using mock mode');
+      return null;
+    }
+    
+    supabaseInstance = createClient(supabaseUrl, supabaseKey);
+    return supabaseInstance;
+  } catch (error) {
+    console.warn('Failed to initialize Supabase:', error);
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   try {
+    const supabase = await getSupabase();
     const body = await request.json();
     const { email, name, userType } = body;
 
@@ -17,6 +36,21 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Valid email is required' },
         { status: 400 }
+      );
+    }
+
+    // If Supabase is not configured, return mock success
+    if (!supabase) {
+      console.log('Using mock mode for waitlist signup:', email);
+      return NextResponse.json(
+        { 
+          success: true,
+          message: 'Successfully joined waitlist (demo mode)',
+          position: Math.floor(Math.random() * 1000) + 5000,
+          email: email,
+          mock: true
+        },
+        { status: 200 }
       );
     }
 
@@ -72,6 +106,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const supabase = await getSupabase();
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
 
@@ -79,6 +114,18 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { error: 'Email is required' },
         { status: 400 }
+      );
+    }
+
+    // If Supabase is not configured, return mock response
+    if (!supabase) {
+      return NextResponse.json(
+        { 
+          exists: false,
+          mock: true,
+          message: 'Supabase not configured - demo mode'
+        },
+        { status: 200 }
       );
     }
 
