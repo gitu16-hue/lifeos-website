@@ -120,14 +120,18 @@ export async function POST(request: Request) {
     const validationResult = WaitlistSchema.safeParse(body);
     if (!validationResult.success) {
       console.warn(`[${requestId}] ⚠️ Validation failed:`, validationResult.error.format());
+  
+      // Safely extract errors
+      const errorDetails = validationResult.error.issues.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+
       return NextResponse.json(
         {
           error: 'Validation failed',
           code: 'VALIDATION_ERROR',
-          details: validationResult.error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
+          details: errorDetails,
         },
         { status: 400 }
       );
