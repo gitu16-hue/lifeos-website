@@ -3,6 +3,21 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { Resend } from 'resend';
 
+// ==================== TYPES ====================
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+interface WaitlistInsert {
+  email: string;
+  name: string | null;
+  user_type: string;
+  source: string;
+  created_at: string;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  metadata?: Json;
+}
+
 // ==================== CONFIGURATION ====================
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,7 +89,6 @@ const WaitlistSchema = z.object({
 let supabase: ReturnType<typeof createClient> | null = null;
 
 if (supabaseUrl && supabaseKey) {
-  // Create Supabase client with timeout handling
   supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
@@ -82,7 +96,6 @@ if (supabaseUrl && supabaseKey) {
     },
     global: {
       fetch: (url, options) => {
-        // Add timeout of 15 seconds to prevent hanging
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         
@@ -138,7 +151,6 @@ export async function POST(request: Request) {
         { 
           error: 'Service temporarily unavailable', 
           code: 'SERVICE_UNAVAILABLE',
-          details: process.env.NODE_ENV === 'development' ? 'Supabase not configured' : undefined
         },
         { status: 503 }
       );
@@ -178,63 +190,38 @@ export async function POST(request: Request) {
     const { email, name, userType, source, utm_source, utm_medium, utm_campaign } = validationResult.data;
 
     // ========== CHECK FOR EXISTING EMAIL ==========
-    let existingUser = null;
-    let checkError = null;
-    
     try {
-      const result = await supabase
+      const { data: existingUser, error: checkError } = await supabase
         .from('waitlist')
         .select('id')
         .eq('email', email)
         .maybeSingle();
-      
-      existingUser = result.data;
-      checkError = result.error;
+
+      if (checkError) {
+        console.error(`[${requestId}] ❌ Database check error:`, checkError);
+        return NextResponse.json(
+          { error: 'Failed to check waitlist status', code: 'DATABASE_CHECK_FAILED' },
+          { status: 500 }
+        );
+      }
+
+      if (existingUser) {
+        console.log(`[${requestId}] ⚠️ Duplicate email: ${email}`);
+        return NextResponse.json(
+          { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
+          { status: 409 }
+        );
+      }
     } catch (err: any) {
-      console.error(`[${requestId}] ❌ Database check exception:`, {
-        message: err.message,
-        name: err.name,
-        cause: err.cause,
-      });
-      
+      console.error(`[${requestId}] ❌ Database check exception:`, err.message);
       return NextResponse.json(
-        { 
-          error: 'Database connection error', 
-          code: 'DATABASE_CONNECTION_ERROR',
-          details: process.env.NODE_ENV === 'development' ? err.message : undefined
-        },
+        { error: 'Database connection error', code: 'DATABASE_CONNECTION_ERROR' },
         { status: 503 }
       );
     }
 
-    if (checkError) {
-      console.error(`[${requestId}] ❌ Database check error:`, {
-        message: checkError.message,
-        details: checkError.details,
-        hint: checkError.hint,
-        code: checkError.code,
-      });
-      
-      return NextResponse.json(
-        { 
-          error: 'Failed to check waitlist status', 
-          code: 'DATABASE_CHECK_FAILED',
-          details: process.env.NODE_ENV === 'development' ? checkError.message : undefined
-        },
-        { status: 500 }
-      );
-    }
-
-    if (existingUser) {
-      console.log(`[${requestId}] ⚠️ Duplicate email: ${email}`);
-      return NextResponse.json(
-        { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
-        { status: 409 }
-      );
-    }
-
     // ========== INSERT INTO DATABASE ==========
-    const insertData = {
+    const insertData: WaitlistInsert = {
       email,
       name: name || null,
       user_type: userType,
@@ -243,124 +230,103 @@ export async function POST(request: Request) {
       utm_source: utm_source || null,
       utm_medium: utm_medium || null,
       utm_campaign: utm_campaign || null,
-      
+      metadata: {
+        ip: clientIp,
+        user_agent: request.headers.get('user-agent'),
+        timestamp: new Date().toISOString()
+      }
     };
 
-    let data = null;
-    let insertError = null;
-    
     try {
-      const result = await supabase
+      const { data, error: insertError } = await supabase
         .from('waitlist')
         .insert([insertData])
         .select()
         .single();
-      
-      data = result.data;
-      insertError = result.error;
-    } catch (err: any) {
-      console.error(`[${requestId}] ❌ Insert exception:`, {
-        message: err.message,
-        name: err.name,
-        cause: err.cause,
-      });
-      
+
+      if (insertError) {
+        console.error(`[${requestId}] ❌ Insert error:`, insertError);
+        
+        if (insertError.code === '23505') {
+          return NextResponse.json(
+            { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
+            { status: 409 }
+          );
+        }
+        
+        return NextResponse.json(
+          { error: 'Failed to join waitlist', code: 'DATABASE_ERROR' },
+          { status: 500 }
+        );
+      }
+
+      if (!data) {
+        console.error(`[${requestId}] ❌ No data returned from insert`);
+        return NextResponse.json(
+          { error: 'Failed to join waitlist - no data returned', code: 'NO_DATA_RETURNED' },
+          { status: 500 }
+        );
+      }
+
+      // ========== GET POSITION ==========
+      let position = 0;
+      try {
+        const { count } = await supabase
+          .from('waitlist')
+          .select('*', { count: 'exact', head: true })
+          .lt('id', data.id);
+        position = (count || 0) + 1;
+      } catch (error) {
+        console.error(`[${requestId}] ⚠️ Failed to get position:`, error);
+      }
+
+      // ========== SEND EMAIL (NON-BLOCKING) ==========
+      if (resend && email) {
+        sendConfirmationEmail(requestId, email, name, position).catch(error => 
+          console.error(`[${requestId}] ❌ Email send failed:`, error)
+        );
+      }
+
+      const responseTime = Date.now() - startTime;
+      console.log(`[${requestId}] ✅ Success (${responseTime}ms) - ${email}`);
+
       return NextResponse.json(
-        { 
-          error: 'Database connection error during insert', 
-          code: 'DATABASE_INSERT_CONNECTION_ERROR',
-          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        {
+          success: true,
+          message: 'Successfully joined the waitlist!',
+          data: { 
+            id: data.id, 
+            position, 
+            email: data.email 
+          },
         },
+        {
+          status: 200,
+          headers: {
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-Request-ID': requestId,
+            'X-Response-Time': `${responseTime}ms`,
+          }
+        }
+      );
+
+    } catch (err: any) {
+      console.error(`[${requestId}] ❌ Insert exception:`, err.message);
+      return NextResponse.json(
+        { error: 'Database connection error during insert', code: 'DATABASE_INSERT_CONNECTION_ERROR' },
         { status: 503 }
       );
     }
 
-    if (insertError) {
-      console.error(`[${requestId}] ❌ Insert error:`, {
-        message: insertError.message,
-        code: insertError.code,
-        details: insertError.details,
-      });
-      
-      if (insertError.code === '23505') {
-        return NextResponse.json(
-          { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
-          { status: 409 }
-        );
-      }
-      
-      return NextResponse.json(
-        { 
-          error: 'Failed to join waitlist', 
-          code: 'DATABASE_ERROR',
-          details: process.env.NODE_ENV === 'development' ? insertError.message : undefined
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!data) {
-      console.error(`[${requestId}] ❌ No data returned from insert`);
-      return NextResponse.json(
-        { error: 'Failed to join waitlist - no data returned', code: 'NO_DATA_RETURNED' },
-        { status: 500 }
-      );
-    }
-
-    // ========== GET POSITION ==========
-    let position = 0;
-    try {
-      const { count } = await supabase
-        .from('waitlist')
-        .select('*', { count: 'exact', head: true })
-        .lt('id', data.id);
-      position = (count || 0) + 1;
-    } catch (error) {
-      console.error(`[${requestId}] ⚠️ Failed to get position:`, error);
-      // Continue without position - not critical
-    }
-
-    // ========== SEND EMAIL (NON-BLOCKING) ==========
-    if (resend && email) {
-      sendConfirmationEmail(requestId, email, name, position).catch(error => 
-        console.error(`[${requestId}] ❌ Email send failed:`, error)
-      );
-    }
-
-    const responseTime = Date.now() - startTime;
-    console.log(`[${requestId}] ✅ Success (${responseTime}ms) - ${email}`);
-
-    // ========== SUCCESS RESPONSE ==========
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Successfully joined the waitlist!',
-        data: { id: data.id, position, email: data.email },
-      },
-      {
-        status: 200,
-        headers: {
-          'X-RateLimit-Remaining': remaining.toString(),
-          'X-Request-ID': requestId,
-          'X-Response-Time': `${responseTime}ms`,
-        }
-      }
-    );
-
   } catch (error) {
     const responseTime = Date.now() - startTime;
-    console.error(`[${requestId}] ❌ Unhandled error (${responseTime}ms):`, {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      error: JSON.stringify(error, Object.getOwnPropertyNames(error))
-    });
+    console.error(`[${requestId}] ❌ Unhandled error (${responseTime}ms):`, error);
     
     return NextResponse.json(
       { 
         error: 'An unexpected error occurred', 
         code: 'INTERNAL_SERVER_ERROR', 
         requestId,
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined
       },
       { status: 500 }
     );
@@ -418,7 +384,7 @@ async function sendConfirmationEmail(requestId: string, email: string, name: str
   if (!resend) return;
   
   try {
-    const { data, error } = await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: 'LifeOS <waitlist@lifeos.ai>',
       to: [email],
       subject: 'Welcome to the LifeOS Waitlist! 🚀',
@@ -439,23 +405,7 @@ async function sendConfirmationEmail(requestId: string, email: string, name: str
               <div style="padding: 40px 30px;">
                 <h2 style="color: #6C5CE7; margin-top: 0;">You're on the list! 🎉</h2>
                 <p>Hi ${name || 'there'},</p>
-                <p>Thank you for joining the LifeOS waitlist. You're <strong style="color: #6C5CE7;">#${position}</strong> in line!</p>
-                <div style="background: #f8f8f8; padding: 20px; border-radius: 8px; margin: 30px 0;">
-                  <h3 style="margin-top: 0;">What's next?</h3>
-                  <ul style="padding-left: 20px;">
-                    <li>📧 We'll notify you when it's your turn</li>
-                    <li>🎁 Early access members get lifetime discounts</li>
-                    <li>💬 Join our community for updates</li>
-                  </ul>
-                </div>
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="https://twitter.com/lifeos" style="display: inline-block; padding: 12px 24px; background: #6C5CE7; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Follow us on Twitter</a>
-                </div>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #999; font-size: 12px; text-align: center;">
-                  © 2026 LifeOS. All rights reserved.<br>
-                  <a href="https://lifeos.ai/unsubscribe?email=${encodeURIComponent(email)}" style="color: #999;">Unsubscribe</a>
-                </p>
+                <p>You're #${position} in line! We'll notify you when it's your turn.</p>
               </div>
             </div>
           </body>
