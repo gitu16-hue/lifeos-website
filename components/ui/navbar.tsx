@@ -21,21 +21,11 @@ export function Navbar() {
   }, []);
 
   const navItems = [
-    { name: 'Vision', href: '/vision', section: true },
-    { name: 'Platform', href: '/platform', section: true },
-    { name: 'Product', href: '/product', section: true },
-    { name: 'Blog', href: '/blog', section: false },
+    { name: 'Vision', href: '/vision' },
+    { name: 'Platform', href: '/platform' },
+    { name: 'Product', href: '/product' },
+    { name: 'Blog', href: '/blog' },
   ];
-
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string, isSection: boolean) => {
-    if (isSection) {
-      e.preventDefault();
-      const element = document.getElementById(href.substring(1));
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
 
   return (
     <motion.nav
@@ -80,7 +70,6 @@ export function Navbar() {
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={(e) => handleNavClick(e, item.href, item.section)}
                 className="text-sm text-gray-300 hover:text-white transition-colors relative group cursor-pointer"
               >
                 {item.name}
@@ -124,10 +113,7 @@ export function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={(e) => {
-                    handleNavClick(e, item.href, item.section);
-                    setIsMobileMenuOpen(false);
-                  }}
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="text-gray-300 hover:text-white transition-colors py-2 cursor-pointer"
                 >
                   {item.name}
