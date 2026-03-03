@@ -243,11 +243,7 @@ export async function POST(request: Request) {
       utm_source: utm_source || null,
       utm_medium: utm_medium || null,
       utm_campaign: utm_campaign || null,
-      metadata: { 
-        ip: clientIp, 
-        user_agent: request.headers.get('user-agent'),
-        timestamp: new Date().toISOString()
-      },
+      
     };
 
     let data = null;
