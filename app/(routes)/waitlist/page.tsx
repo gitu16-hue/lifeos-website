@@ -219,13 +219,6 @@ export default function WaitlistPage() {
                   </div>
                 </div>
 
-                {/* Demo Notice */}
-                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '8px' }}>
-                  <p style={{ color: '#FFD700', fontSize: '12px', margin: 0 }}>
-                    ⚠️ Demo mode: Data will be simulated. Connect Supabase for real collection.
-                  </p>
-                </div>
-
                 {/* Error */}
                 {error && (
                   <div style={{ padding: '12px', background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', borderRadius: '8px' }}>
