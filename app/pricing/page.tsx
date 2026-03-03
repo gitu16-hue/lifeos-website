@@ -22,7 +22,23 @@ import { ThreeDBackground } from '@/components/3d/background';
 import { Footer } from '@/components/ui/footer';
 import Link from 'next/link';
 
-const plans = [
+interface Plan {
+  id: string;
+  name: string;
+  price: string;
+  inrPrice: string;
+  period: string;
+  description: string;
+  icon: any;
+  features: string[];
+  gradient: string;
+  buttonText: string;
+  popular: boolean;
+  href: string;
+  razorpayAmount?: number; // Make it optional with ?
+}
+
+const plans: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
@@ -95,13 +111,11 @@ export default function PricingPage() {
 
   const handleCardClick = (planId: string) => {
     if (planId === 'pro') {
-      // For Pro plan, find and click the Razorpay button
       const proButton = document.querySelector('#pro-payment-button button');
       if (proButton) {
         (proButton as HTMLButtonElement).click();
       }
     }
-    // For other plans, navigation is handled by Link component
   };
 
   return (
@@ -136,7 +150,6 @@ export default function PricingPage() {
               const isHovered = hoveredCard === plan.id;
               const isPro = plan.id === 'pro';
 
-              // For Pro plan - use div with click handler
               if (isPro) {
                 return (
                   <div
@@ -196,7 +209,7 @@ export default function PricingPage() {
                         
                         <div id="pro-payment-button" onClick={(e) => e.stopPropagation()}>
                           <RazorpayButton 
-                            amount={plan.razorpayAmount} 
+                            amount={plan.razorpayAmount!} // Use non-null assertion since we know it exists for pro plan
                             planName={plan.name}
                           />
                         </div>
@@ -206,7 +219,6 @@ export default function PricingPage() {
                 );
               }
 
-              // For Starter and Enterprise - use Link
               return (
                 <Link
                   key={plan.id}
