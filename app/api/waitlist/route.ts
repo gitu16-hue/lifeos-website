@@ -8,9 +8,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 
-// Log missing env vars but don't crash
-if (!supabaseUrl || !supabaseKey) console.error('❌ Missing Supabase environment variables');
-if (!resendApiKey) console.warn('⚠️ Missing Resend API key - emails disabled');
+// Log environment status on startup
+console.log('🚀 API Route initialized:', {
+  environment: process.env.NODE_ENV,
+  platform: process.env.VERCEL ? 'vercel' : 'local',
+  supabaseUrl: supabaseUrl ? '✅ present' : '❌ missing',
+  supabaseKey: supabaseKey ? '✅ present' : '❌ missing',
+  resendKey: resendApiKey ? '✅ present' : '❌ missing',
+});
 
 // ==================== SIMPLE RATE LIMITER ====================
 interface RateLimitRecord {
@@ -65,14 +70,43 @@ const WaitlistSchema = z.object({
   utm_campaign: z.string().optional().nullable(),
 });
 
-// ==================== SUPABASE & RESEND CLIENTS ====================
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+// ==================== SUPABASE CLIENT WITH TIMEOUT ====================
+let supabase: ReturnType<typeof createClient> | null = null;
+
+if (supabaseUrl && supabaseKey) {
+  // Create Supabase client with timeout handling
+  supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      fetch: (url, options) => {
+        // Add timeout of 15 seconds to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        return fetch(url, {
+          ...options,
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeoutId));
+      },
+    },
+  });
+  console.log('✅ Supabase client initialized with timeout');
+} else {
+  console.error('❌ Supabase client not initialized - missing credentials');
+}
+
+// ==================== RESEND CLIENT ====================
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 // ==================== POST HANDLER ====================
 export async function POST(request: Request) {
   const requestId = Math.random().toString(36).substring(7);
-  console.log(`[${requestId}] 📥 POST /api/waitlist`);
+  const startTime = Date.now();
+  
+  console.log(`[${requestId}] 📥 POST /api/waitlist started`);
 
   try {
     // ========== RATE LIMITING ==========
@@ -101,7 +135,11 @@ export async function POST(request: Request) {
     if (!supabase) {
       console.error(`[${requestId}] ❌ Supabase client not available`);
       return NextResponse.json(
-        { error: 'Service temporarily unavailable', code: 'SERVICE_UNAVAILABLE' },
+        { 
+          error: 'Service temporarily unavailable', 
+          code: 'SERVICE_UNAVAILABLE',
+          details: process.env.NODE_ENV === 'development' ? 'Supabase not configured' : undefined
+        },
         { status: 503 }
       );
     }
@@ -110,7 +148,8 @@ export async function POST(request: Request) {
     let body;
     try {
       body = await request.json();
-    } catch {
+    } catch (e) {
+      console.error(`[${requestId}] ❌ Invalid JSON body:`, e);
       return NextResponse.json(
         { error: 'Invalid request body', code: 'INVALID_JSON' },
         { status: 400 }
@@ -121,7 +160,6 @@ export async function POST(request: Request) {
     if (!validationResult.success) {
       console.warn(`[${requestId}] ⚠️ Validation failed:`, validationResult.error.format());
   
-      // Safely extract errors
       const errorDetails = validationResult.error.issues.map(err => ({
         field: err.path.join('.'),
         message: err.message,
@@ -140,21 +178,55 @@ export async function POST(request: Request) {
     const { email, name, userType, source, utm_source, utm_medium, utm_campaign } = validationResult.data;
 
     // ========== CHECK FOR EXISTING EMAIL ==========
-    const { data: existingUser, error: checkError } = await supabase
-      .from('waitlist')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    let existingUser = null;
+    let checkError = null;
+    
+    try {
+      const result = await supabase
+        .from('waitlist')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      
+      existingUser = result.data;
+      checkError = result.error;
+    } catch (err: any) {
+      console.error(`[${requestId}] ❌ Database check exception:`, {
+        message: err.message,
+        name: err.name,
+        cause: err.cause,
+      });
+      
+      return NextResponse.json(
+        { 
+          error: 'Database connection error', 
+          code: 'DATABASE_CONNECTION_ERROR',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        },
+        { status: 503 }
+      );
+    }
 
     if (checkError) {
-      console.error(`[${requestId}] ❌ Database check error:`, checkError);
+      console.error(`[${requestId}] ❌ Database check error:`, {
+        message: checkError.message,
+        details: checkError.details,
+        hint: checkError.hint,
+        code: checkError.code,
+      });
+      
       return NextResponse.json(
-        { error: 'Failed to check waitlist status', code: 'DATABASE_CHECK_FAILED' },
+        { 
+          error: 'Failed to check waitlist status', 
+          code: 'DATABASE_CHECK_FAILED',
+          details: process.env.NODE_ENV === 'development' ? checkError.message : undefined
+        },
         { status: 500 }
       );
     }
 
     if (existingUser) {
+      console.log(`[${requestId}] ⚠️ Duplicate email: ${email}`);
       return NextResponse.json(
         { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
         { status: 409 }
@@ -174,26 +246,68 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString()
       },
     };
+    
     if (utm_source) insertData.utm_source = utm_source;
     if (utm_medium) insertData.utm_medium = utm_medium;
     if (utm_campaign) insertData.utm_campaign = utm_campaign;
 
-    const { data, error: insertError } = await supabase
-      .from('waitlist')
-      .insert([insertData])
-      .select()
-      .single();
+    let data = null;
+    let insertError = null;
+    
+    try {
+      const result = await supabase
+        .from('waitlist')
+        .insert([insertData])
+        .select()
+        .single();
+      
+      data = result.data;
+      insertError = result.error;
+    } catch (err: any) {
+      console.error(`[${requestId}] ❌ Insert exception:`, {
+        message: err.message,
+        name: err.name,
+        cause: err.cause,
+      });
+      
+      return NextResponse.json(
+        { 
+          error: 'Database connection error during insert', 
+          code: 'DATABASE_INSERT_CONNECTION_ERROR',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        },
+        { status: 503 }
+      );
+    }
 
     if (insertError) {
-      console.error(`[${requestId}] ❌ Insert error:`, insertError);
+      console.error(`[${requestId}] ❌ Insert error:`, {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+      });
+      
       if (insertError.code === '23505') {
         return NextResponse.json(
           { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
           { status: 409 }
         );
       }
+      
       return NextResponse.json(
-        { error: 'Failed to join waitlist', code: 'DATABASE_ERROR' },
+        { 
+          error: 'Failed to join waitlist', 
+          code: 'DATABASE_ERROR',
+          details: process.env.NODE_ENV === 'development' ? insertError.message : undefined
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
+      console.error(`[${requestId}] ❌ No data returned from insert`);
+      return NextResponse.json(
+        { error: 'Failed to join waitlist - no data returned', code: 'NO_DATA_RETURNED' },
         { status: 500 }
       );
     }
@@ -208,12 +322,18 @@ export async function POST(request: Request) {
       position = (count || 0) + 1;
     } catch (error) {
       console.error(`[${requestId}] ⚠️ Failed to get position:`, error);
+      // Continue without position - not critical
     }
 
     // ========== SEND EMAIL (NON-BLOCKING) ==========
     if (resend && email) {
-      sendConfirmationEmail(requestId, email, name, position).catch(console.error);
+      sendConfirmationEmail(requestId, email, name, position).catch(error => 
+        console.error(`[${requestId}] ❌ Email send failed:`, error)
+      );
     }
+
+    const responseTime = Date.now() - startTime;
+    console.log(`[${requestId}] ✅ Success (${responseTime}ms) - ${email}`);
 
     // ========== SUCCESS RESPONSE ==========
     return NextResponse.json(
@@ -227,14 +347,26 @@ export async function POST(request: Request) {
         headers: {
           'X-RateLimit-Remaining': remaining.toString(),
           'X-Request-ID': requestId,
+          'X-Response-Time': `${responseTime}ms`,
         }
       }
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Unhandled error:`, error);
+    const responseTime = Date.now() - startTime;
+    console.error(`[${requestId}] ❌ Unhandled error (${responseTime}ms):`, {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    });
+    
     return NextResponse.json(
-      { error: 'An unexpected error occurred', code: 'INTERNAL_SERVER_ERROR', requestId },
+      { 
+        error: 'An unexpected error occurred', 
+        code: 'INTERNAL_SERVER_ERROR', 
+        requestId,
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined
+      },
       { status: 500 }
     );
   }
@@ -242,6 +374,8 @@ export async function POST(request: Request) {
 
 // ==================== GET HANDLER ====================
 export async function GET(request: Request) {
+  const requestId = Math.random().toString(36).substring(7);
+  
   try {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
@@ -249,6 +383,7 @@ export async function GET(request: Request) {
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
+    
     if (!supabase) {
       return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
     }
@@ -270,11 +405,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       exists: true,
-      data: { id: data.id, position: (count || 0) + 1, joinedAt: data.created_at },
+      data: { 
+        id: data.id, 
+        position: (count || 0) + 1, 
+        joinedAt: data.created_at 
+      },
     });
 
   } catch (error) {
-    console.error('❌ GET error:', error);
+    console.error(`[${requestId}] ❌ GET error:`, error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -282,6 +421,7 @@ export async function GET(request: Request) {
 // ==================== EMAIL HELPER ====================
 async function sendConfirmationEmail(requestId: string, email: string, name: string | null, position: number) {
   if (!resend) return;
+  
   try {
     const { data, error } = await resend.emails.send({
       from: 'LifeOS <waitlist@lifeos.ai>',
@@ -312,6 +452,9 @@ async function sendConfirmationEmail(requestId: string, email: string, name: str
                     <li>🎁 Early access members get lifetime discounts</li>
                     <li>💬 Join our community for updates</li>
                   </ul>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="https://twitter.com/lifeos" style="display: inline-block; padding: 12px 24px; background: #6C5CE7; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Follow us on Twitter</a>
                 </div>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #999; font-size: 12px; text-align: center;">
