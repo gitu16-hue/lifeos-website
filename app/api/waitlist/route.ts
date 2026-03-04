@@ -8,10 +8,10 @@ type Json = string | number | boolean | null | { [key: string]: Json | undefined
 
 interface WaitlistInsert {
   email: string;
-  name: string | null;
-  user_type: string;
-  source: string;
-  created_at: string;
+  name?: string | null;  // Made optional with ?
+  user_type?: string;     // Made optional
+  source?: string;        // Made optional
+  created_at?: string;    // Made optional
   utm_source?: string | null;
   utm_medium?: string | null;
   utm_campaign?: string | null;
@@ -132,7 +132,10 @@ export async function POST(request: Request) {
     if (!rateLimitSuccess) {
       console.warn(`[${requestId}] ⚠️ Rate limit exceeded for IP: ${clientIp}`);
       return NextResponse.json(
-        { error: 'Too many requests. Please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
+        { 
+          error: 'Too many requests. Please try again later.', 
+          code: 'RATE_LIMIT_EXCEEDED' 
+        },
         {
           status: 429,
           headers: {
@@ -163,7 +166,10 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error(`[${requestId}] ❌ Invalid JSON body:`, e);
       return NextResponse.json(
-        { error: 'Invalid request body', code: 'INVALID_JSON' },
+        { 
+          error: 'Invalid request body', 
+          code: 'INVALID_JSON' 
+        },
         { status: 400 }
       );
     }
@@ -200,7 +206,11 @@ export async function POST(request: Request) {
       if (checkError) {
         console.error(`[${requestId}] ❌ Database check error:`, checkError);
         return NextResponse.json(
-          { error: 'Failed to check waitlist status', code: 'DATABASE_CHECK_FAILED' },
+          { 
+            error: 'Failed to check waitlist status', 
+            code: 'DATABASE_CHECK_FAILED',
+            details: process.env.NODE_ENV === 'development' ? checkError.message : undefined
+          },
           { status: 500 }
         );
       }
@@ -208,20 +218,26 @@ export async function POST(request: Request) {
       if (existingUser) {
         console.log(`[${requestId}] ⚠️ Duplicate email: ${email}`);
         return NextResponse.json(
-          { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
+          { 
+            error: 'This email is already on the waitlist', 
+            code: 'DUPLICATE_EMAIL' 
+          },
           { status: 409 }
         );
       }
     } catch (err: any) {
       console.error(`[${requestId}] ❌ Database check exception:`, err.message);
       return NextResponse.json(
-        { error: 'Database connection error', code: 'DATABASE_CONNECTION_ERROR' },
+        { 
+          error: 'Database connection error', 
+          code: 'DATABASE_CONNECTION_ERROR' 
+        },
         { status: 503 }
       );
     }
 
     // ========== INSERT INTO DATABASE ==========
-    const insertData: WaitlistInsert = {
+    const insertData = {
       email,
       name: name || null,
       user_type: userType,
@@ -233,7 +249,8 @@ export async function POST(request: Request) {
       metadata: {
         ip: clientIp,
         user_agent: request.headers.get('user-agent'),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        request_id: requestId
       }
     };
 
@@ -247,15 +264,45 @@ export async function POST(request: Request) {
       if (insertError) {
         console.error(`[${requestId}] ❌ Insert error:`, insertError);
         
+        // Handle specific error codes
         if (insertError.code === '23505') {
           return NextResponse.json(
-            { error: 'This email is already on the waitlist', code: 'DUPLICATE_EMAIL' },
+            { 
+              error: 'This email is already on the waitlist', 
+              code: 'DUPLICATE_EMAIL' 
+            },
             { status: 409 }
           );
         }
         
+        if (insertError.code === '23502') {
+          return NextResponse.json(
+            { 
+              error: 'Missing required fields', 
+              code: 'MISSING_FIELDS',
+              details: insertError.message
+            },
+            { status: 400 }
+          );
+        }
+        
+        if (insertError.code === '42P01') {
+          console.error(`[${requestId}] ❌ Table does not exist`);
+          return NextResponse.json(
+            { 
+              error: 'Database configuration error', 
+              code: 'TABLE_NOT_FOUND' 
+            },
+            { status: 500 }
+          );
+        }
+        
         return NextResponse.json(
-          { error: 'Failed to join waitlist', code: 'DATABASE_ERROR' },
+          { 
+            error: 'Failed to join waitlist', 
+            code: 'DATABASE_ERROR',
+            details: process.env.NODE_ENV === 'development' ? insertError.message : undefined
+          },
           { status: 500 }
         );
       }
@@ -263,7 +310,10 @@ export async function POST(request: Request) {
       if (!data) {
         console.error(`[${requestId}] ❌ No data returned from insert`);
         return NextResponse.json(
-          { error: 'Failed to join waitlist - no data returned', code: 'NO_DATA_RETURNED' },
+          { 
+            error: 'Failed to join waitlist - no data returned', 
+            code: 'NO_DATA_RETURNED' 
+          },
           { status: 500 }
         );
       }
@@ -271,20 +321,29 @@ export async function POST(request: Request) {
       // ========== GET POSITION ==========
       let position = 0;
       try {
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
           .from('waitlist')
           .select('*', { count: 'exact', head: true })
           .lt('id', data.id);
-        position = (count || 0) + 1;
+
+        if (countError) {
+          console.error(`[${requestId}] ⚠️ Failed to get position:`, countError);
+        } else {
+          position = (count || 0) + 1;
+        }
       } catch (error) {
         console.error(`[${requestId}] ⚠️ Failed to get position:`, error);
       }
 
       // ========== SEND EMAIL (NON-BLOCKING) ==========
       if (resend && email) {
-        sendConfirmationEmail(requestId, email, name, position).catch(error => 
-          console.error(`[${requestId}] ❌ Email send failed:`, error)
-        );
+        // Don't await - fire and forget
+        sendConfirmationEmail(requestId, email, name, position).catch(error => {
+          console.error(`[${requestId}] ❌ Email send failed:`, error);
+          // Log to error tracking service if available
+        });
+      } else {
+        console.log(`[${requestId}] ⚠️ Email not sent - Resend not configured`);
       }
 
       const responseTime = Date.now() - startTime;
@@ -313,7 +372,10 @@ export async function POST(request: Request) {
     } catch (err: any) {
       console.error(`[${requestId}] ❌ Insert exception:`, err.message);
       return NextResponse.json(
-        { error: 'Database connection error during insert', code: 'DATABASE_INSERT_CONNECTION_ERROR' },
+        { 
+          error: 'Database connection error during insert', 
+          code: 'DATABASE_INSERT_CONNECTION_ERROR' 
+        },
         { status: 503 }
       );
     }
@@ -342,11 +404,17 @@ export async function GET(request: Request) {
     const email = searchParams.get('email');
 
     if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Email is required' }, 
+        { status: 400 }
+      );
     }
     
     if (!supabase) {
-      return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+      return NextResponse.json(
+        { error: 'Service unavailable' }, 
+        { status: 503 }
+      );
     }
 
     const { data, error } = await supabase
@@ -355,14 +423,29 @@ export async function GET(request: Request) {
       .eq('email', email)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error(`[${requestId}] ❌ GET error:`, error);
+      return NextResponse.json(
+        { 
+          error: 'Failed to check waitlist status',
+          code: 'DATABASE_ERROR'
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
       return NextResponse.json({ exists: false });
     }
 
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('waitlist')
       .select('*', { count: 'exact', head: true })
       .lt('id', data.id);
+
+    if (countError) {
+      console.error(`[${requestId}] ❌ Count error:`, countError);
+    }
 
     return NextResponse.json({
       exists: true,
@@ -375,15 +458,26 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error(`[${requestId}] ❌ GET error:`, error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR'
+      },
+      { status: 500 }
+    );
   }
 }
 
 // ==================== EMAIL HELPER ====================
 async function sendConfirmationEmail(requestId: string, email: string, name: string | null, position: number) {
-  if (!resend) return;
+  if (!resend) {
+    console.log(`[${requestId}] 📧 Email not sent - Resend not configured`);
+    return;
+  }
   
   try {
+    const firstName = name ? name.split(' ')[0] : 'there';
+    
     const { error } = await resend.emails.send({
       from: 'LifeOS <waitlist@lifeos.ai>',
       to: [email],
@@ -404,12 +498,40 @@ async function sendConfirmationEmail(requestId: string, email: string, name: str
               </div>
               <div style="padding: 40px 30px;">
                 <h2 style="color: #6C5CE7; margin-top: 0;">You're on the list! 🎉</h2>
-                <p>Hi ${name || 'there'},</p>
-                <p>You're #${position} in line! We'll notify you when it's your turn.</p>
+                <p>Hi ${firstName},</p>
+                <p>Thanks for joining the LifeOS waitlist! You're <strong>#${position.toLocaleString()}</strong> in line.</p>
+                <p>We'll notify you when it's your turn to experience the AI-powered operating system that designs, executes, and optimizes your life.</p>
+                <div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                  <p style="margin: 0; color: #666; font-size: 14px;">While you wait, follow us for updates:</p>
+                  <p style="margin: 10px 0 0;">
+                    <a href="https://twitter.com/lifeos" style="color: #6C5CE7; text-decoration: none; margin: 0 10px;">Twitter</a> •
+                    <a href="https://discord.gg/lifeos" style="color: #6C5CE7; text-decoration: none; margin: 0 10px;">Discord</a> •
+                    <a href="https://lifeos.ai/blog" style="color: #6C5CE7; text-decoration: none; margin: 0 10px;">Blog</a>
+                  </p>
+                </div>
+                <p style="color: #999; font-size: 14px; text-align: center; margin-top: 30px;">
+                  © ${new Date().getFullYear()} LifeOS. All rights reserved.
+                </p>
               </div>
             </div>
           </body>
         </html>
+      `,
+      text: `
+        Welcome to the LifeOS Waitlist!
+        
+        Hi ${firstName},
+        
+        Thanks for joining the LifeOS waitlist! You're #${position.toLocaleString()} in line.
+        
+        We'll notify you when it's your turn to experience the AI-powered operating system that designs, executes, and optimizes your life.
+        
+        While you wait, follow us for updates:
+        Twitter: https://twitter.com/lifeos
+        Discord: https://discord.gg/lifeos
+        Blog: https://lifeos.ai/blog
+        
+        © ${new Date().getFullYear()} LifeOS. All rights reserved.
       `
     });
 
