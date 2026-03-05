@@ -2,12 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface WaitlistEntry {
   id: number;
@@ -16,7 +11,15 @@ interface WaitlistEntry {
   user_type: string;
   source: string;
   created_at: string;
-  metadata: any;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  metadata: {
+    ip?: string;
+    user_agent?: string;
+    timestamp?: string;
+    request_id?: string;
+  } | null;
 }
 
 export default function WaitlistAdmin() {
@@ -26,8 +29,12 @@ export default function WaitlistAdmin() {
     total: 0,
     today: 0,
     professionals: 0,
-    individuals: 0
+    individuals: 0,
+    enterprises: 0,
+    students: 0
   });
+
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchWaitlist();
@@ -36,22 +43,28 @@ export default function WaitlistAdmin() {
   async function fetchWaitlist() {
     setLoading(true);
     
-    // Fetch entries
-    const { data: entries } = await supabase
+    const { data: entries, error } = await supabase
       .from('waitlist')
       .select('*')
       .order('created_at', { ascending: false });
 
+    if (error) {
+      console.error('Error fetching waitlist:', error);
+      setLoading(false);
+      return;
+    }
+
     if (entries) {
       setEntries(entries);
       
-      // Calculate stats
       const today = new Date().toDateString();
       setStats({
         total: entries.length,
         today: entries.filter(e => new Date(e.created_at).toDateString() === today).length,
         professionals: entries.filter(e => e.user_type === 'professional').length,
-        individuals: entries.filter(e => e.user_type === 'individual').length
+        individuals: entries.filter(e => e.user_type === 'individual').length,
+        enterprises: entries.filter(e => e.user_type === 'enterprise').length,
+        students: entries.filter(e => e.user_type === 'student').length
       });
     }
 
@@ -59,7 +72,8 @@ export default function WaitlistAdmin() {
   }
 
   async function exportToCSV() {
-    const headers = ['ID', 'Email', 'Name', 'Type', 'Source', 'Date', 'IP', 'UTM Source'];
+    const headers = ['ID', 'Email', 'Name', 'Type', 'Source', 'Date', 'IP', 'UTM Source', 'UTM Medium', 'UTM Campaign'];
+    
     const csvData = entries.map(e => [
       e.id,
       e.email,
@@ -68,7 +82,9 @@ export default function WaitlistAdmin() {
       e.source,
       new Date(e.created_at).toLocaleString(),
       e.metadata?.ip || '',
-      e.utm_source || ''
+      e.utm_source || '',
+      e.utm_medium || '',
+      e.utm_campaign || ''
     ]);
 
     const csv = [headers, ...csvData].map(row => row.join(',')).join('\n');
@@ -78,10 +94,15 @@ export default function WaitlistAdmin() {
     a.href = url;
     a.download = `waitlist-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   }
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
   }
 
   return (
@@ -89,7 +110,7 @@ export default function WaitlistAdmin() {
       <h1 className="text-3xl font-bold mb-8">Waitlist Admin Dashboard</h1>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm text-gray-500">Total Signups</h3>
           <p className="text-3xl font-bold">{stats.total.toLocaleString()}</p>
@@ -106,50 +127,81 @@ export default function WaitlistAdmin() {
           <h3 className="text-sm text-gray-500">Individuals</h3>
           <p className="text-3xl font-bold">{stats.individuals}</p>
         </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Enterprises</h3>
+          <p className="text-3xl font-bold">{stats.enterprises}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Students</h3>
+          <p className="text-3xl font-bold">{stats.students}</p>
+        </div>
       </div>
 
       {/* Export Button */}
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <button
           onClick={exportToCSV}
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
           Export to CSV
         </button>
+        <button
+          onClick={fetchWaitlist}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Refresh Data
+        </button>
       </div>
 
       {/* Waitlist Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {entries.map(entry => (
-              <tr key={entry.id}>
-                <td className="px-6 py-4 text-sm">{entry.id}</td>
-                <td className="px-6 py-4 text-sm">{entry.email}</td>
-                <td className="px-6 py-4 text-sm">{entry.name || '-'}</td>
-                <td className="px-6 py-4 text-sm">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                    {entry.user_type}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm">{entry.source}</td>
-                <td className="px-6 py-4 text-sm">
-                  {new Date(entry.created_at).toLocaleDateString()}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UTM Source</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {entries.map((entry) => (
+                <tr key={entry.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.name || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                      ${entry.user_type === 'professional' ? 'bg-purple-100 text-purple-800' : ''}
+                      ${entry.user_type === 'individual' ? 'bg-green-100 text-green-800' : ''}
+                      ${entry.user_type === 'enterprise' ? 'bg-blue-100 text-blue-800' : ''}
+                      ${entry.user_type === 'student' ? 'bg-yellow-100 text-yellow-800' : ''}
+                    `}>
+                      {entry.user_type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.source}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.utm_source || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(entry.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.metadata?.ip || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {entries.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No waitlist entries yet
+          </div>
+        )}
       </div>
     </div>
   );
