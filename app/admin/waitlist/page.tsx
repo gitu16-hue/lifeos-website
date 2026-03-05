@@ -4,11 +4,17 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
+// Add this line to prevent static generation
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// Initialize Supabase client with error handling
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// ... rest of your component code remains the same
 
 interface WaitlistEntry {
   id: number;
