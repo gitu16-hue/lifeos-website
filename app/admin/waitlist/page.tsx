@@ -1,0 +1,156 @@
+// app/admin/waitlist/page.tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+interface WaitlistEntry {
+  id: number;
+  email: string;
+  name: string | null;
+  user_type: string;
+  source: string;
+  created_at: string;
+  metadata: any;
+}
+
+export default function WaitlistAdmin() {
+  const [entries, setEntries] = useState<WaitlistEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    today: 0,
+    professionals: 0,
+    individuals: 0
+  });
+
+  useEffect(() => {
+    fetchWaitlist();
+  }, []);
+
+  async function fetchWaitlist() {
+    setLoading(true);
+    
+    // Fetch entries
+    const { data: entries } = await supabase
+      .from('waitlist')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (entries) {
+      setEntries(entries);
+      
+      // Calculate stats
+      const today = new Date().toDateString();
+      setStats({
+        total: entries.length,
+        today: entries.filter(e => new Date(e.created_at).toDateString() === today).length,
+        professionals: entries.filter(e => e.user_type === 'professional').length,
+        individuals: entries.filter(e => e.user_type === 'individual').length
+      });
+    }
+
+    setLoading(false);
+  }
+
+  async function exportToCSV() {
+    const headers = ['ID', 'Email', 'Name', 'Type', 'Source', 'Date', 'IP', 'UTM Source'];
+    const csvData = entries.map(e => [
+      e.id,
+      e.email,
+      e.name || '',
+      e.user_type,
+      e.source,
+      new Date(e.created_at).toLocaleString(),
+      e.metadata?.ip || '',
+      e.utm_source || ''
+    ]);
+
+    const csv = [headers, ...csvData].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `waitlist-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  }
+
+  if (loading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold mb-8">Waitlist Admin Dashboard</h1>
+      
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Total Signups</h3>
+          <p className="text-3xl font-bold">{stats.total.toLocaleString()}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Today</h3>
+          <p className="text-3xl font-bold">{stats.today}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Professionals</h3>
+          <p className="text-3xl font-bold">{stats.professionals}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Individuals</h3>
+          <p className="text-3xl font-bold">{stats.individuals}</p>
+        </div>
+      </div>
+
+      {/* Export Button */}
+      <div className="mb-4">
+        <button
+          onClick={exportToCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          Export to CSV
+        </button>
+      </div>
+
+      {/* Waitlist Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {entries.map(entry => (
+              <tr key={entry.id}>
+                <td className="px-6 py-4 text-sm">{entry.id}</td>
+                <td className="px-6 py-4 text-sm">{entry.email}</td>
+                <td className="px-6 py-4 text-sm">{entry.name || '-'}</td>
+                <td className="px-6 py-4 text-sm">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                    {entry.user_type}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm">{entry.source}</td>
+                <td className="px-6 py-4 text-sm">
+                  {new Date(entry.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
