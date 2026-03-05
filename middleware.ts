@@ -1,21 +1,68 @@
 // middleware.ts
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  let response = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          req.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: CookieOptions) {
+          req.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
+
+  const { data: { session } } = await supabase.auth.getSession()
 
   // Check if trying to access admin routes
   if (req.nextUrl.pathname.startsWith('/admin')) {
     if (!session) {
-      const redirectUrl = new URL('/auth', req.url);
-      return NextResponse.redirect(redirectUrl);
+      const redirectUrl = new URL('/auth', req.url)
+      return NextResponse.redirect(redirectUrl)
     }
 
     // Check if user has admin role
@@ -23,19 +70,25 @@ export async function middleware(req: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('id', session.user.id)
-      .single();
+      .single()
 
-    if (profile?.role !== 'admin') {
-      // Redirect to home or show unauthorized
-      const redirectUrl = new URL('/', req.url);
-      return NextResponse.redirect(redirectUrl);
+    if (!profile || profile.role !== 'admin') {
+      // Redirect to home if not admin
+      const redirectUrl = new URL('/', req.url)
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
-  return res;
+  // Redirect from auth page if already logged in
+  if (req.nextUrl.pathname.startsWith('/auth') && session) {
+    const redirectUrl = new URL('/admin/waitlist', req.url)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  return response
 }
 
 // Configure which routes to run middleware on
 export const config = {
   matcher: ['/admin/:path*', '/auth/:path*'],
-};
+}
