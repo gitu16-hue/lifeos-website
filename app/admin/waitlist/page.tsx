@@ -4,9 +4,10 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Add this line to prevent static generation
+// Only keep 'force-dynamic', remove 'revalidate'
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+
+// ... rest of your component code
 
 // Initialize Supabase client with error handling
 const supabase = createClient(

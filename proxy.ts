@@ -1,9 +1,9 @@
-// middleware.ts
+// proxy.ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: req.headers,
@@ -73,7 +73,6 @@ export async function middleware(req: NextRequest) {
       .single()
 
     if (!profile || profile.role !== 'admin') {
-      // Redirect to home if not admin
       const redirectUrl = new URL('/', req.url)
       return NextResponse.redirect(redirectUrl)
     }
@@ -88,7 +87,6 @@ export async function middleware(req: NextRequest) {
   return response
 }
 
-// Configure which routes to run middleware on
 export const config = {
   matcher: ['/admin/:path*', '/auth/:path*'],
 }
