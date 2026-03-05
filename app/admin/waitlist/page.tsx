@@ -2,7 +2,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface WaitlistEntry {
   id: number;
@@ -33,8 +39,6 @@ export default function WaitlistAdmin() {
     enterprises: 0,
     students: 0
   });
-
-  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchWaitlist();
@@ -107,7 +111,15 @@ export default function WaitlistAdmin() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Waitlist Admin Dashboard</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Waitlist Admin Dashboard</h1>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+        >
+          Sign Out
+        </button>
+      </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
